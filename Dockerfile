@@ -7,7 +7,7 @@ WORKDIR /app/
 # Install Dependency
 COPY requirements.txt /app/
 RUN pip install -r ./requirements.txt
-RUN sudo apt-get install libgomp1
+RUN apt-get install libgomp1
 
 # Copy local folder into the container
 COPY app.py /app/
