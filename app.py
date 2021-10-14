@@ -3,7 +3,6 @@ import pandas as pd
 import warnings
 import sklearn
 import boto3
-import xgboost
 import os
 from scipy import sparse, io
 from joblib import dump, load
@@ -19,9 +18,6 @@ app = Flask(__name__)
 """
 
 BUCKET_NAME = "sameer-iitm-bucket-1"
-
-import os
-print(os.environ['HOME'])
 
 s3 = boto3.resource("s3",
      		aws_access_key_id = os.environ['aws_access_key_id'],

@@ -10,4 +10,6 @@ How to set env variable on linux machine
  export aws_access_key_id="XXX"
  
  export aws_secret_access_key="XXX"
+
+pip3 freeze > requirements.txt -> This is used to generate requirements.txt
  
