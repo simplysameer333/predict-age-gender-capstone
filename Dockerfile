@@ -6,8 +6,7 @@ WORKDIR /app/
 
 # Install Dependency
 COPY requirements.txt /app/
-RUN apt-get update
-RUN apt-get install libgomp1-dbg
+RUN apt-get update && apt-get -y --no-install-recommends install libgomp1
 RUN pip install -r ./requirements.txt
 
 
