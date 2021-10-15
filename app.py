@@ -38,9 +38,15 @@ xgb_best_age_group_model = load(best_age_model)
 
 # Fetch data to be predicted (Test Data)
 data_path = 'test_sample/'
+
 test_data_50_sample_path = 'test_data_50_sample.npz'
+test_50_device_ids_path = 'test_50_device_ids.csv'
+
+s3.Bucket(BUCKET_NAME).download_file(data_path+test_50_device_ids_path, test_50_device_ids_path)
 s3.Bucket(BUCKET_NAME).download_file(data_path+test_data_50_sample_path, test_data_50_sample_path)
+
 test_data_50_sample = sparse.load_npz(test_data_50_sample_path)
+test_50_device_id_df = pd.read_csv(test_50_device_ids_path, encoding='utf-8', dtype={'app_id': 'string'} )
 
 # Load Preprossed event data
 Xtest_events_path = 'Xtest_events.npz'
@@ -78,7 +84,7 @@ def predict_gender():
 	#merge gender and age
 	device_ids_gender_prbabilities_df = pd.concat([device_ids_gender_prbabilities_df, xgb_best_gender_model_prediction_df], axis = 1)
 	return jsonify(device_ids_gender_prbabilities_df.to_json())  
-	
+
 
 @app.route('/predict_female', methods=['GET'])
 def predect_female_customers():
