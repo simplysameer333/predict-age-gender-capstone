@@ -45,6 +45,19 @@ test_data_50_sample_path = 'test_data_50_sample.npz'
 s3.Bucket(BUCKET_NAME).download_file(data_path+test_data_50_sample_path, test_data_50_sample_path)
 test_data_50_sample = sparse.load_npz(test_data_50_sample_path)
 
+# Load Preprossed event data
+Xtest_events_path = 'Xtest_events.npz'
+s3.Bucket(BUCKET_NAME).download_file(data_path+Xtest_events_path, Xtest_events_path)
+Xtest_events = sparse.load_npz(Xtest_events_path)
+
+#Load indexed device ids
+test_data_df_path = 'test_data_df.csv'
+s3.Bucket(BUCKET_NAME).download_file(data_path+test_data_df_path, test_data_df_path)
+test_data_df = pd.read_csv(test_data_df_path, encoding='utf-8')
+
+# Filter device ids w.r.t events
+event_test_data = test_data_df[test_data_df['has_events']==1]
+
 @app.route('/')
 def home():
     return 'Hello World'
@@ -62,6 +75,20 @@ def predict_gender():
 	#merge gender and age
 	gender_age_group_prbabilities_df = pd.concat([xgb_best_gender_prediction_df, xgb_best_age_group_prediction_df], axis = 1)
 	return jsonify(gender_age_group_prbabilities_df.to_json())  
+
+def predect_female_customers():
+	xgb_best_gender_model_prediction = xgb_best_gender_model.predict(Xtest_events)
+	event_test_data['predict_gender'] = xgb_best_gender_model_prediction
+	#F=0, M=1
+	event_test_data[event_test_data['predict_gender']==0][['device_id']]
+	return jsonify(event_test_data.to_json())  
+
+def predect_male_customers():
+	xgb_best_gender_model_prediction = xgb_best_gender_model.predict(Xtest_events)
+	event_test_data['predict_gender'] = xgb_best_gender_model_prediction
+	#F=0, M=1
+	event_test_data[event_test_data['predict_gender']==1][['device_id']]
+	return jsonify(event_test_data.to_json())  
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
