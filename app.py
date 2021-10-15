@@ -76,6 +76,7 @@ def predict_gender():
 	gender_age_group_prbabilities_df = pd.concat([xgb_best_gender_prediction_df, xgb_best_age_group_prediction_df], axis = 1)
 	return jsonify(gender_age_group_prbabilities_df.to_json())  
 
+@app.route('/predict_female', methods=['GET'])
 def predect_female_customers():
 	xgb_best_gender_model_prediction = xgb_best_gender_model.predict(Xtest_events)
 	event_test_data['predict_gender'] = xgb_best_gender_model_prediction
@@ -83,6 +84,7 @@ def predect_female_customers():
 	event_test_data[event_test_data['predict_gender']==0][['device_id']]
 	return jsonify(event_test_data.to_json())  
 
+@app.route('/predict_male', methods=['GET'])
 def predect_male_customers():
 	xgb_best_gender_model_prediction = xgb_best_gender_model.predict(Xtest_events)
 	event_test_data['predict_gender'] = xgb_best_gender_model_prediction
