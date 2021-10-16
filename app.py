@@ -205,5 +205,24 @@ def predect_male_customers():
 	male_prediction = event_test_data[event_test_data['male_probability']<=max_probability_3_decile][['device_id']]
 	return jsonify(male_prediction.to_json())  
 
+@app.route('/predict_age_bucket/<age_group>', methods=['GET'])
+def predict_age_bucket(age_group):
+
+	# Load encoders
+	label_group_label_encoder = getAgeGroupLabel()
+
+	# age-group prediction
+	event_test_data['predicted_age_group'] = xgb_best_age_group_model.predict(Xtest_events)
+	print(age_group)
+
+	age_group_mapping = dict(zip(label_group_label_encoder.classes_, label_group_label_encoder.transform(label_group_label_encoder.classes_)))
+	print(age_group_mapping)
+
+	print(age_group_mapping[age_group])
+	#age_group_prediction = event_test_data[event_test_data['predicted_age_group']==age_group_mapping][['device_id']]
+	age_group_prediction = event_test_data
+	
+	return jsonify(age_group_prediction.to_json()) 
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
