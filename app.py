@@ -11,6 +11,9 @@ from flask import Flask, request, jsonify, render_template
 
 warnings.filterwarnings("ignore")
 
+'''
+K-Table to divide probabilities in 10 deciles. Base probabilities are based on 'male'
+'''
 def ks_statistics(probabilities, classes) :
   probabilities_df = pd.DataFrame(data=probabilities, columns=classes.classes_)
   probabilities_df = probabilities_df.sort_values('M').reset_index(drop=True)
@@ -48,11 +51,12 @@ def ks_statistics(probabilities, classes) :
   return agg2
 
 app = Flask(__name__)
-"""# **4. Model Deployment**
 
+"""# **4. Model Deployment**
 ## **4.1 Load best models from S3**
 """
 
+#Bucket Name
 BUCKET_NAME = "sameer-iitm-bucket-1"
 
 s3 = boto3.resource("s3",
@@ -60,36 +64,38 @@ s3 = boto3.resource("s3",
 	aws_secret_access_key = os.environ['aws_secret_access_key']
 )
 
+#Load models
 model_path = 'model/'
 best_gender_model = 'xgb_best_gender_event_model.joblib'
 best_age_model = 'xgb_grid_age_group_event_model.joblib'
 
 s3.Bucket(BUCKET_NAME).download_file(model_path+best_gender_model, best_gender_model)
 s3.Bucket(BUCKET_NAME).download_file(model_path+best_age_model, best_age_model)
-
 xgb_best_gender_model = load(best_gender_model)
 xgb_best_age_group_model = load(best_age_model)
 
-"""## **4.2 Best Test data from S3**"""
 
-# Fetch data to be predicted (Test Data)
+"""## **4.2 Fetch Test data from S3**"""
+# To avoid re-work, we have saved the preprossed 'TEST DATASET' in the bucket. 
+# Here ransom 50-sample data from that prepossed data is used to. 
+# This data was saved s3 before starting Modeling process. 
+# 50 device Ids are also saved, they are matched using indices and cane b concat.
+
 data_path = 'test_sample/'
-
 test_data_50_sample_path = 'test_data_50_sample.npz'
 test_50_device_ids_path = 'test_50_device_ids.csv'
 
 s3.Bucket(BUCKET_NAME).download_file(data_path+test_50_device_ids_path, test_50_device_ids_path)
 s3.Bucket(BUCKET_NAME).download_file(data_path+test_data_50_sample_path, test_data_50_sample_path)
-
 test_data_50_sample = sparse.load_npz(test_data_50_sample_path)
 test_50_device_id_df = pd.read_csv(test_50_device_ids_path, encoding='utf-8', dtype={'app_id': 'string'} )
 
-# Load Preprossed event data
+# Load Preprossed TEST EVENT data. This data was saved after feature engineering[enoded features]. 
 Xtest_events_path = 'Xtest_events.npz'
 s3.Bucket(BUCKET_NAME).download_file(data_path+Xtest_events_path, Xtest_events_path)
 Xtest_events = sparse.load_npz(Xtest_events_path)
 
-#Load indexed device ids
+# Load indexed device ids, this has Test data [with orginal values]
 test_data_df_path = 'test_data_df.csv'
 s3.Bucket(BUCKET_NAME).download_file(data_path+test_data_df_path, test_data_df_path)
 test_data_df = pd.read_csv(test_data_df_path, encoding='utf-8')
@@ -97,13 +103,17 @@ test_data_df = pd.read_csv(test_data_df_path, encoding='utf-8')
 # Filter device ids w.r.t events
 event_test_data = test_data_df[test_data_df['has_events']==1]
 
+#Restore encoders
+encoder_folder = 'encoder/'
+
 #Last line
 print("Gender Prediction system is up ....")
 
+'''
+This function is used to load the gender label encoder from S3. 
+This is required for class prediction done for different campaign.
+'''
 def getGenderLabel():
-	#Restore encoders
-	encoder_folder = 'encoder/'
-
 	#Gender label encoder
 	label_gender_encoder_path = 'label_gender.sav'
 	s3.Bucket(BUCKET_NAME).download_file(encoder_folder+label_gender_encoder_path, label_gender_encoder_path)
@@ -111,33 +121,60 @@ def getGenderLabel():
 	label_gender_label_encoder = pickle.load(file)
 	return label_gender_label_encoder
 
+'''
+This function is used to load the AGE GROUP label encoder from S3. 
+This is required for class prediction done for different campaign.
+'''
+def getAgeGroupLabel():
+	#Gender label encoder
+	label_group_encoder_path = 'label_group.sav'
+	s3.Bucket(BUCKET_NAME).download_file(encoder_folder+label_group_encoder_path, label_group_encoder_path)
+	file = open(label_group_encoder_path, 'rb')
+	label_group_label_encoder = pickle.load(file)
+	return label_group_label_encoder
+
+'''
+Test endpoint to check sever is up
+'''
 @app.route('/')
 def home():
     return 'Hello World'
 
+'''
+This is used to predict GENDER and AGE GROUP for given 50 samples.
+'''
 @app.route('/predict_gender_age', methods=['GET'])
 def predict_gender():
+
+	# Load encoders
+	label_gender_label_encoder = getGenderLabel()
+	label_group_label_encoder = getAgeGroupLabel()
+
 	# gender probabilities
 	xgb_best_gender_model_prediction = xgb_best_gender_model.predict_proba(test_data_50_sample)
-	xgb_best_gender_model_prediction_df = pd.DataFrame(data=xgb_best_gender_model_prediction, columns=["M", "F"])
+	xgb_best_gender_model_prediction_df = pd.DataFrame(data=xgb_best_gender_model_prediction, columns=label_gender_label_encoder.classes_)
 
 	# Add device ids (matched by indices)
 	device_ids_gender_prbabilities_df = pd.concat([test_50_device_id_df, xgb_best_gender_model_prediction_df], axis = 1)
 
 	# age probabilities
 	xgb_best_age_group_prediction = xgb_best_age_group_model.predict_proba(test_data_50_sample)
-	xgb_best_gender_model_prediction_df = pd.DataFrame(data=xgb_best_age_group_prediction, columns=["0-24", "25-32", "32+"])
+	xgb_best_gender_model_prediction_df = pd.DataFrame(data=xgb_best_age_group_prediction, columns=label_group_label_encoder.classes_)
 
 	#merge gender and age
 	device_ids_gender_prbabilities_df = pd.concat([device_ids_gender_prbabilities_df, xgb_best_gender_model_prediction_df], axis = 1)
 	return jsonify(device_ids_gender_prbabilities_df.to_json())  
 
-
+'''
+Predict 
+'''
 @app.route('/predict_female', methods=['GET'])
 def predect_female_customers():
 
+	# load encoder
 	label_gender_label_encoder = getGenderLabel()
 	
+	# create K-table to spilt data in 10 decile
 	xgb_best_gender_model_prob = xgb_best_gender_model.predict_proba(Xtest_events)
 	ks_table_gender = ks_statistics(xgb_best_gender_model_prob,label_gender_label_encoder)
 
@@ -153,8 +190,10 @@ def predect_female_customers():
 @app.route('/predict_male', methods=['GET'])
 def predect_male_customers():
 
+	# load encoder
 	label_gender_label_encoder = getGenderLabel()
 	
+	# create K-table to spilt data in 10 decile
 	xgb_best_gender_model_prob = xgb_best_gender_model.predict_proba(Xtest_events)
 	ks_table_gender = ks_statistics(xgb_best_gender_model_prob,label_gender_label_encoder)
 
