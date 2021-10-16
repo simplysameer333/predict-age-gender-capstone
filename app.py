@@ -218,9 +218,8 @@ def predict_age_bucket(age_group):
 	age_group_mapping = dict(zip(label_group_label_encoder.classes_, label_group_label_encoder.transform(label_group_label_encoder.classes_)))
 	print(age_group_mapping)
 
-	print(age_group_mapping[age_group])
-	#age_group_prediction = event_test_data[event_test_data['predicted_age_group']==age_group_mapping][['device_id']]
-	age_group_prediction = event_test_data
+	print('group ', age_group_mapping[age_group])
+	age_group_prediction = event_test_data[event_test_data['predicted_age_group']==age_group_mapping[age_group]][['device_id']]
 	
 	return jsonify(age_group_prediction.to_json()) 
 
